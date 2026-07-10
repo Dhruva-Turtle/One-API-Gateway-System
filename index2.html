@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneAPI Portal Widget v2</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; margin: 40px; }
+        #chat-widget {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 360px; height: 480px;
+            background: #ffffff; border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            display: flex; flex-direction: column; overflow: hidden;
+            border: 1px solid #e1e4e8;
+        }
+        #chat-header { background: #0066fe; color: white; padding: 16px; font-weight: 600; font-size: 15px; }
+        #chat-history { flex: 1; padding: 16px; overflow-y: auto; background: #f9fafb; display: flex; flex-direction: column; gap: 10px; }
+        #chat-input-area { display: flex; border-top: 1px solid #e1e4e8; background: white; }
+        #user-input { flex: 1; padding: 14px; border: none; outline: none; font-size: 14px; }
+        #send-btn { background: #0066fe; color: white; border: none; padding: 0 18px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
+        #send-btn:hover { background: #0052cc; }
+        .msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; max-width: 75%; word-wrap: break-word; }
+        .user { background: #0066fe; color: white; align-self: flex-end; }
+        .bot { background: #eaeaea; color: #1a1a1a; align-self: flex-start; }
+    </style>
+</head>
+<body>
+
+    <h2>OneAPI Portal Dashboard v2</h2>
+    <p>Your clean, isolated development widget environment is ready.</p>
+
+    <div id="chat-widget">
+        <div id="chat-header">OneAPI Assistant</div>
+        <div id="chat-history">
+            <div class="msg bot">Hello! Ask me to log in or issue a platform access token.</div>
+        </div>
+        <div id="chat-input-area">
+            <input type="text" id="user-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()">
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script>
+        async function sendMessage() {
+            const inputField = document.getElementById('user-input');
+            const history = document.getElementById('chat-history');
+            const query = inputField.value.trim();
+            if (!query) return;
+
+            // 1. Render User Message instantly
+            history.innerHTML += `<div class="msg user">${query}</div>`;
+            inputField.value = '';
+            history.scrollTop = history.scrollHeight;
+
+            // 2. Add a quick placeholder loader
+            const loaderId = 'loader_' + Date.now();
+            history.innerHTML += `<div class="msg bot" id="${loaderId}"><i>Thinking...</i></div>`;
+            history.scrollTop = history.scrollHeight;
+
+            try {
+                // 3. Dispatch directly to our clean FastAPI endpoint on Port 8005
+                const response = await fetch('http://127.0.0.1:8005/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: query })
+                });
+                
+                const data = await response.json();
+                
+                // Remove loader and insert actual response text
+                document.getElementById(loaderId).outerHTML = `<div class="msg bot">${data.response}</div>`;
+            } catch (error) {
+                document.getElementById(loaderId).outerHTML = `<div class="msg bot" style="color: #dc3545; background: #fde8e8;">⚠️ Connection failed. Check terminal.</div>`;
+            }
+            history.scrollTop = history.scrollHeight;
+        }
+    </script>
+</body>
+</html>
