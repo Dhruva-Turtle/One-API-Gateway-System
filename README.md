@@ -41,7 +41,7 @@ The gateway is built on a modular stack designed for resilience, self-healing, a
 
 
 
-TechStack:
+**TechStack:**
 
 1.HTML5
 
@@ -63,7 +63,7 @@ TechStack:
 
 
 
-OneAPI Gateway: Core Features
+###OneAPI Gateway: Core Features
 
 
 1.Conversational Chat Widget UI: Allows developers to test and trigger backend operations using natural language rather than manual code or scripts.
@@ -132,10 +132,51 @@ After installing, add the one-api.yml file to path /mcp-service-be/namespaces/
 Next make a one-api folder inside /mcp-service-be/namespaces/resources/assets and add one-apidocs.json file inside the folder
 
 
+# Running
+
+PostGRE:
+
+Host: localhost
+
+User: gateway_user
+
+database: oneapi_db
+
+port: 5432
+
+
+MCP:
+
+```bash
+#Terminal 1
+mcp-service-be/python3 -m src.main
+
+#Terminal 2 (Optional)
+#MCP Inspector
+npx @modelcontextprotocol/inspector@latest
+
+```
 
 
 ```bash
+#Main File
+app2.py
 
 ```
+Double Click index.html in folder file
+
+
+**Required Ports**
+
+1. PostgreSQL: 5432
+
+2. MCP Gateway Server: 7002
+
+3. Main Chatbot Backend: 8005
+
+4. MCP Inspector Web UI: 6274
+  
+5. MCP Inspector Proxy: 6277
+
 
 
