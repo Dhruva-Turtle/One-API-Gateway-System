@@ -100,9 +100,34 @@ pip install fastapi uvicorn psycopg2-binary requests numpy python-dotenv
 pip install langchain-openai langchain-chroma langchain-huggingface
 ```
 
+Create a .env file inside folder and add configuration details
+```bash
+touch .env
+```
+```bash
+#Open .env file and details
+GITHUB_TOKEN="your_github_models_token_here"
+DATABASE_URL="postgresql://gateway_user:mysecretpassword@localhost:5432/oneapi_db"
+```
 
+PostGRE SQL initialization
 
+```bash
+# 1. Spin up the background PostgreSQL service
+brew services start postgresql
 
+# 2. Create the target administrative user role
+createuser -s gateway_user
+
+# 3. Provision the specific relational database
+createdb oneapi_db -O gateway_user
+```
+
+### MCP Installation
+
+Follow Installation Process at https://github.com/Turtlemint-India/mcp-service-be
+
+After installing, export json from https://app.skyfall.turtle-feature.com/api/v2/docs/
 
 
 
