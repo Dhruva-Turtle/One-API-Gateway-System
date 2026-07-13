@@ -127,7 +127,7 @@ createdb oneapi_db -O gateway_user
 
 Follow Installation Process at https://github.com/Turtlemint-India/mcp-service-be
 
-After installing, export json from https://app.skyfall.turtle-feature.com/api/v2/docs/
+After installing, add the one-api.yml file to
 
 
 
