@@ -56,11 +56,16 @@ TechStack:
 OneAPI Gateway: Core Features
 
 1.Conversational Chat Widget UI: Allows developers to test and trigger backend operations using natural language rather than manual code or scripts.
+
 2.Dynamic Parameter Harvesting: Chronologically scans past database logs to automatically retrieve and populate missing session parameters behind the scenes.
+
 3.On-the-Fly Type Coercion: Validates and converts harvested parameters in RAM to match strict upstream API schemas before execution.
 4.Self-Healing Auto-Retry Loop: Intercepts 500 errors and automatically retries requests with alternative data type combinations (e.g., swapping strings to integers).
+
 5.Zero-Constraint JSONB Logging: Preserves full transaction histories in PostgreSQL using native binary JSON columns to prevent typing mismatch crashes.
+
 6.Adaptive Response Synthesizer: Excludes sensitive credentials, system noise, and empty fields to return clean, highly readable Markdown summaries.
+
 7.Doc Fallback RAG Engine: Searches a local vector database to provide accurate conversational answers to pure documentation and architectural questions.
 
 
