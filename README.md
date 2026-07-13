@@ -127,7 +127,9 @@ createdb oneapi_db -O gateway_user
 
 Follow Installation Process at https://github.com/Turtlemint-India/mcp-service-be
 
-After installing, add the one-api.yml file to
+After installing, add the one-api.yml file to path /mcp-service-be/namespaces/
+
+Next make a one-api folder inside /mcp-service-be/namespaces/resources/assets and add one-apidocs.json file inside the folder
 
 
 
