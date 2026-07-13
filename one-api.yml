@@ -1,0 +1,104 @@
+# -----------------------------------------------------------------------------
+# MCP Namespace Manifest: One API
+# -----------------------------------------------------------------------------
+# This file defines the configuration, tools, and rules for the 'motor'
+# namespace on the Model Context Protocol (MCP) server.
+# -----------------------------------------------------------------------------
+# --- Root Level Configuration ---
+# Basic identification and control for the entire namespace.
+id: one-api
+name: 'One API'
+description: 'This namespace provides a suite of tools from the Turtlefin OneAPI Platform site.'
+# Master switch for the namespace. If true, the entire namespace is disabled and will not be loaded by the MCP server.
+disabled: false
+# Path to the primary API documentation for this namespace. Can be a local file path or a full URL.
+docs_path: 'resources/assets/one-api/one-apidocs.json'
+# --- Tool Configuration ---
+# Defines the tools available within this namespace and their behavior.
+
+# Global control for enabling/disabling tools within this namespace.
+# Options:
+#   'all': All tools listed below are enabled by default (unless individually disabled).
+#   'none': All tools are disabled by default.
+#   'specific': Only tools explicitly marked as enabled (disabled: false) will be active.
+tools_enabled: specific
+tools:
+  #Authentication APIs
+  - name: issueToken
+    description: 'One API Authentication APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: triggerOtpToAutnhenticateUser
+    description: 'One API Authentication APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: verifyOtpToAuthenticateUser
+    description: 'One API Authentication APIs'
+    disabled: false
+    authGroup: 'public'
+
+  #Lookup APIs
+  - name: getMasterDataByResourceCode
+    description: 'One API Lookup APIs'
+    disabled: false
+    authGroup: 'public'
+  #Product Catalog APIs
+  - name: getAllProductCatalogData
+    description: 'One API Product Catalog APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: getAllProductCatalogDataByProductCode
+    description: 'One API Product Catalog APIs'
+    disabled: false
+    authGroup: 'public'
+
+#Validation APIs
+  - name: validateMobile
+    description: 'One API Validation APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: validatePan
+    description: 'One API Validation APIs'
+    disabled: false
+    authGroup: 'public'  
+
+#Quote APIs
+  - name: quickQuote
+    description: 'One API Quote APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: quote
+    description: 'One API Quote APIs'
+    disabled: false
+    authGroup: 'public' 
+
+#Proposal APIs
+  - name: proposal
+    description: 'One API Proposal APIs'
+    disabled: false
+    authGroup: 'public'
+
+#Kyc APIs
+  - name: kyc
+    description: 'One API KYC APIs'
+    disabled: false
+    authGroup: 'public'
+#Policy APIs
+  - name: policyIssuance
+    description: 'One API Policy APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: policystatus
+    description: 'One API Policy APIs'
+    disabled: false
+    authGroup: 'public'
+  - name: policyfetch
+    description: 'One API Policy APIs'
+    disabled: false
+    authGroup: 'public'
+
+#Activity Log APIs
+  - name: trace
+    description: 'One API Activity Log APIs'
+    disabled: false
+    authGroup: 'public'
