@@ -110,6 +110,8 @@ GITHUB_TOKEN="your_github_models_token_here"
 DATABASE_URL="postgresql://gateway_user:mysecretpassword@localhost:5432/oneapi_db"
 ```
 
+If using a different api service, make appropriate changes inplace of GITHUB_TOKEN and at Lines: 13, 17, 284 in app2.py file
+
 PostGRE SQL initialization
 
 ```bash
