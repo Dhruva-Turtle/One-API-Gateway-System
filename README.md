@@ -42,18 +42,29 @@ The gateway is built on a modular stack designed for resilience, self-healing, a
 
 
 TechStack:
+
 1.HTML5
+
 2.JavaScript
+
 3.Tailwind CSS
+
 4.FastAPI
+
 5.Uvicorn
+
 6.Model Context Protocol (MCP)
+
 7.LangChain
+
 8.PostgreSQL
+
 9.Chroma DB
 
 
+
 OneAPI Gateway: Core Features
+
 
 1.Conversational Chat Widget UI: Allows developers to test and trigger backend operations using natural language rather than manual code or scripts.
 
@@ -67,5 +78,37 @@ OneAPI Gateway: Core Features
 6.Adaptive Response Synthesizer: Excludes sensitive credentials, system noise, and empty fields to return clean, highly readable Markdown summaries.
 
 7.Doc Fallback RAG Engine: Searches a local vector database to provide accurate conversational answers to pure documentation and architectural questions.
+
+# Installation
+
+**Using Pip**
+
+```bash
+#Clone Repository 
+git clone <your-repository-url>
+cd <repository-folder-name>
+```
+
+```bash
+#Create Virtual Enviornment
+python3 -m venv env
+source env/bin/activate
+```
+```bash
+#Install Required Libraries
+pip install fastapi uvicorn psycopg2-binary requests numpy python-dotenv
+pip install langchain-openai langchain-chroma langchain-huggingface
+```
+
+
+
+
+
+
+
+
+```bash
+
+```
 
 
