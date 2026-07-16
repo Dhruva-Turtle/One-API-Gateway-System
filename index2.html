@@ -4,74 +4,230 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>OneAPI Portal Widget v2</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; margin: 40px; }
-        #chat-widget {
-            position: fixed; bottom: 20px; right: 20px;
-            width: 360px; height: 480px;
-            background: #ffffff; border-radius: 12px;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
-            display: flex; flex-direction: column; overflow: hidden;
-            border: 1px solid #e1e4e8;
+        body {
+            font-family: 'Inter', sans-serif;
         }
-        #chat-header { background: #0066fe; color: white; padding: 16px; font-weight: 600; font-size: 15px; }
-        #chat-history { flex: 1; padding: 16px; overflow-y: auto; background: #f9fafb; display: flex; flex-direction: column; gap: 10px; }
-        #chat-input-area { display: flex; border-top: 1px solid #e1e4e8; background: white; }
-        #user-input { flex: 1; padding: 14px; border: none; outline: none; font-size: 14px; }
-        #send-btn { background: #0066fe; color: white; border: none; padding: 0 18px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
-        #send-btn:hover { background: #0052cc; }
-        .msg { padding: 10px 14px; border-radius: 8px; font-size: 14px; line-height: 1.4; max-width: 75%; word-wrap: break-word; }
-        .user { background: #0066fe; color: white; align-self: flex-end; }
-        .bot { background: #eaeaea; color: #1a1a1a; align-self: flex-start; }
+        /* Custom scrollbar styling for a cleaner look */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 min-h-screen flex flex-col md:flex-row text-slate-800">
 
-    <h2>OneAPI Portal Dashboard v2</h2>
-    <p>Your clean, isolated development widget environment is ready.</p>
+    <!-- Left Panel: Live Developer Dashboard (Great for showing off the backend during your demo) -->
+    <div class="w-full md:w-1/2 p-6 md:p-12 flex flex-col justify-between border-b md:border-b-0 md:border-r border-slate-200">
+        <div class="space-y-6">
+            <div class="flex items-center space-x-3">
+                <span class="p-2.5 bg-blue-600 text-white rounded-xl shadow-lg shadow-blue-500/30">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                    </svg>
+                </span>
+                <h1 class="text-2xl font-bold tracking-tight text-slate-900">OneAPI Gateway Portal</h1>
+            </div>
+            
+            <p class="text-slate-600 leading-relaxed max-w-md">
+                Your clean, isolated development widget environment is fully provisioned. This portal maps real-time conversational user queries to the local Model Context Protocol core.
+            </p>
 
-    <div id="chat-widget">
-        <div id="chat-header">OneAPI Assistant</div>
-        <div id="chat-history">
-            <div class="msg bot">Hello! Ask me to log in or issue a platform access token.</div>
+            <!-- Active User Session Details -->
+            <div class="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4 max-w-md">
+                <h3 class="font-semibold text-slate-900 flex items-center space-x-2">
+                    <span class="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></span>
+                    <span>Active Session Status</span>
+                </h3>
+                
+                <div class="space-y-2">
+                    <div class="flex justify-between text-xs font-medium text-slate-400 uppercase tracking-wider">
+                        <span>Session Variable</span>
+                        <span>Value</span>
+                    </div>
+                    <div class="flex items-center justify-between py-2 border-b border-slate-100">
+                        <span class="text-sm font-medium text-slate-600">Active Client UUID</span>
+                        <code id="display-session-id" class="text-xs bg-slate-100 text-blue-600 px-2 py-1 rounded font-mono font-bold">session_loading</code>
+                    </div>
+                    <div class="flex items-center justify-between py-2">
+                        <span class="text-sm font-medium text-slate-600">Routing Mode</span>
+                        <span class="text-xs bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full font-medium">Session Isolated</span>
+                    </div>
+                </div>
+
+                <button onclick="resetSession()" class="w-full mt-2 inline-flex items-center justify-center space-x-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-medium py-2.5 px-4 rounded-xl transition duration-200 shadow-sm shadow-slate-900/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 1121.21 15H19M9 5a9 9 0 0112.48 9.88l-1.93-1.93M3 19a9 9 0 0112.48-9.88l-1.93 1.93"></path>
+                    </svg>
+                    <span>Simulate New User Session</span>
+                </button>
+            </div>
         </div>
-        <div id="chat-input-area">
-            <input type="text" id="user-input" placeholder="Type a message..." onkeypress="if(event.key === 'Enter') sendMessage()">
-            <button id="send-btn" onclick="sendMessage()">Send</button>
+
+        <div class="mt-8 text-xs text-slate-400">
+            Powered by OneAPI Parameter Harvester Core • Local Mode (Port 8005)
+        </div>
+    </div>
+
+    <!-- Right Panel: Modern Chat Assistant Interface -->
+    <div class="w-full md:w-1/2 p-6 flex items-center justify-center bg-slate-100/50">
+        <div class="w-full max-w-md h-[540px] bg-white rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-200 flex flex-col overflow-hidden">
+            <!-- Chat Widget Header -->
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 p-4 text-white flex items-center justify-between shadow-md">
+                <div class="flex items-center space-x-3">
+                    <div class="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="font-bold text-sm tracking-tight">OneAPI Assistant</h2>
+                        <span class="text-xs text-blue-100 flex items-center"><span class="w-1.5 h-1.5 bg-emerald-400 rounded-full mr-1.5 animate-pulse"></span>Online</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat History Area -->
+            <div id="chat-history" class="flex-1 p-5 overflow-y-auto bg-slate-50 flex flex-col gap-4">
+                <div class="msg bot max-w-[80%] bg-white border border-slate-100 text-slate-800 text-sm py-3 px-4 rounded-2xl rounded-tl-none shadow-sm align-self-start self-start">
+                    Hello! Ask me to send an OTP or execute platform tasks. All variables are automatically remembered.
+                </div>
+            </div>
+
+            <!-- Input area -->
+            <div class="p-3 bg-white border-t border-slate-100 flex gap-2">
+                <input type="text" id="user-input" placeholder="Say something..." onkeypress="if(event.key === 'Enter') sendMessage()" class="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-blue-500 focus:bg-white transition">
+                <button id="send-btn" onclick="sendMessage()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 rounded-xl font-medium text-sm transition shadow-md shadow-blue-600/10 flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 
     <script>
+        // Global variables to store session states
+        let sessionId = "";
+
+        // Core initialization on widget boot
+        window.onload = function() {
+            initSession();
+        };
+
+        // Generates or retrieves a unique user session ID
+        function initSession() {
+            sessionId = localStorage.getItem("chat_session_id");
+            if (!sessionId) {
+                // Generate secure random string
+                const randomPart = Math.random().toString(36).substring(2, 12);
+                const timePart = Date.now().toString(36);
+                sessionId = `user_${randomPart}_${timePart}`;
+                localStorage.setItem("chat_session_id", sessionId);
+            }
+            // Display active session parameter to the developer
+            document.getElementById("display-session-id").innerText = sessionId;
+        }
+
+        // Generates a new session instantly to simulate a different client
+        function resetSession() {
+            localStorage.removeItem("chat_session_id");
+            initSession();
+            
+            // Clear conversational interface and push clean starting message
+            const history = document.getElementById('chat-history');
+            history.innerHTML = `
+                <div class="msg bot max-w-[80%] bg-white border border-slate-100 text-slate-800 text-sm py-3 px-4 rounded-2xl rounded-tl-none shadow-sm align-self-start self-start">
+                    Hello! I have initialized a completely fresh user workspace. Previous logs are isolated.
+                </div>
+            `;
+        }
+
+        // Lightweight Markdown parser to render AI summaries professionally
+        function formatMarkdown(text) {
+            if (!text) return "";
+            let formatted = text;
+            
+            // Convert bold formatting (**text**)
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            
+            // Convert simple Bullet list tags (* item or - item)
+            formatted = formatted.replace(/^\s*[\-\*]\s+(.*)$/gm, '<li class="ml-4 list-disc text-slate-700">$1</li>');
+            
+            // Convert newlines (\n) to <br>
+            formatted = formatted.replace(/\n/g, '<br>');
+            
+            return formatted;
+        }
+
+        // Handles communication logic to Port 8005
         async function sendMessage() {
             const inputField = document.getElementById('user-input');
             const history = document.getElementById('chat-history');
             const query = inputField.value.trim();
             if (!query) return;
 
-            // 1. Render User Message instantly
-            history.innerHTML += `<div class="msg user">${query}</div>`;
+            // 1. Render User Message Instantly inside UI bubble
+            history.innerHTML += `
+                <div class="msg user max-w-[80%] bg-blue-600 text-white text-sm py-3 px-4 rounded-2xl rounded-tr-none shadow-sm align-self-end self-end">
+                    ${query}
+                </div>
+            `;
             inputField.value = '';
             history.scrollTop = history.scrollHeight;
 
-            // 2. Add a quick placeholder loader
+            // 2. Add dynamic loader element
             const loaderId = 'loader_' + Date.now();
-            history.innerHTML += `<div class="msg bot" id="${loaderId}"><i>Thinking...</i></div>`;
+            history.innerHTML += `
+                <div class="msg bot max-w-[80%] bg-white border border-slate-100 text-slate-500 text-sm py-3 px-4 rounded-2xl rounded-tl-none shadow-sm align-self-start self-start" id="${loaderId}">
+                    <div class="flex items-center space-x-2">
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.1s"></span>
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></span>
+                        <span class="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style="animation-delay: 0.3s"></span>
+                    </div>
+                </div>
+            `;
             history.scrollTop = history.scrollHeight;
 
             try {
-                // 3. Dispatch directly to our clean FastAPI endpoint on Port 8005
+                // 3. POST request with explicit session isolation variables
                 const response = await fetch('http://127.0.0.1:8005/chat', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: query })
+                    body: JSON.stringify({ 
+                        message: query,
+                        session_id: sessionId // Forwarding custom user session key!
+                    })
                 });
                 
                 const data = await response.json();
                 
-                // Remove loader and insert actual response text
-                document.getElementById(loaderId).outerHTML = `<div class="msg bot">${data.response}</div>`;
+                // Format synthesized responses elegantly
+                const formattedHtml = formatMarkdown(data.response);
+                
+                // Render synthesized result directly
+                document.getElementById(loaderId).outerHTML = `
+                    <div class="msg bot max-w-[80%] bg-white border border-slate-100 text-slate-800 text-sm py-3 px-4 rounded-2xl rounded-tl-none shadow-sm align-self-start self-start">
+                        ${formattedHtml}
+                    </div>
+                `;
             } catch (error) {
-                document.getElementById(loaderId).outerHTML = `<div class="msg bot" style="color: #dc3545; background: #fde8e8;">⚠️ Connection failed. Check terminal.</div>`;
+                document.getElementById(loaderId).outerHTML = `
+                    <div class="msg bot max-w-[80%] text-rose-700 bg-rose-50 border border-rose-100 text-sm py-3 px-4 rounded-2xl rounded-tl-none shadow-sm align-self-start self-start">
+                        ⚠️ Connection failed. Check backend console.
+                    </div>
+                `;
             }
             history.scrollTop = history.scrollHeight;
         }

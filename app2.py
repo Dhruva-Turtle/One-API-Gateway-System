@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
+import contextvars
 
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -17,6 +18,31 @@ load_dotenv()
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://gateway_user:mysecretpassword@localhost:5432/oneapi_db")
+
+# ContextVar for async context-safe session management within FastAPI request cycles
+active_session_id = contextvars.ContextVar("active_session_id", default="default")
+
+class SessionRegistry:
+    """Thread-safe global tracker to preserve active user session across LangChain ThreadPools."""
+    _last_active = "default"
+    
+    @classmethod
+    def set_active(cls, session_id: str):
+        cls._last_active = session_id
+        
+    @classmethod
+    def get_active(cls) -> str:
+        return cls._last_active
+
+def get_current_session_id() -> str:
+    """Retrieves session id from context or global registry fallback for background threads."""
+    try:
+        val = active_session_id.get()
+        if val == "default":
+            return SessionRegistry.get_active()
+        return val
+    except Exception:
+        return SessionRegistry.get_active()
 
 app = FastAPI(title="OneAPI Gateway - PostgreSQL JSONB Parameter Harvester")
 
@@ -33,7 +59,7 @@ local_embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
 db = Chroma(persist_directory="./chroma_local_db", embedding_function=local_embeddings)
 
 def init_db():
-    """Initializes the PostgreSQL database with an immune JSONB payload column."""
+    """Initializes the PostgreSQL database with an immune JSONB payload column and user scoping."""
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
@@ -41,9 +67,17 @@ def init_db():
             CREATE TABLE IF NOT EXISTS response_logs (
                 id SERIAL PRIMARY KEY,
                 timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                session_id VARCHAR(255) DEFAULT 'default',
                 payload JSONB
             )
         """)
+        # Dynamic schema migration: add session_id if it's an existing legacy table
+        cursor.execute("""
+            ALTER TABLE response_logs 
+            ADD COLUMN IF NOT EXISTS session_id VARCHAR(255) DEFAULT 'default'
+        """)
+        # Create user session index for fast queries
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_response_logs_session_id ON response_logs(session_id)")
         conn.commit()
         cursor.close()
         conn.close()
@@ -54,24 +88,37 @@ def init_db():
 init_db()
 
 def log_raw_response(res_json: dict):
-    """Saves any successful backend response into Postgres as an unstructured data dictionary."""
+    """Saves any successful backend response into Postgres scoped by the active user's session."""
+    session_id = get_current_session_id()
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
-        cursor.execute("INSERT INTO response_logs (payload) VALUES (%s)", (json.dumps(res_json),))
+        cursor.execute(
+            "INSERT INTO response_logs (session_id, payload) VALUES (%s, %s)",
+            (session_id, json.dumps(res_json))
+        )
         conn.commit()
         cursor.close()
         conn.close()
+        print(f"💾 [DATABASE LOG] Saved raw payload successfully under session: {session_id}")
     except Exception as e:
         print(f"⚠️ [DATABASE LOG] Failed to preserve database packet in PostgreSQL: {e}")
 
-def get_all_raw_logs() -> list:
-    """Retrieves long-term chronological log history out of the PostgreSQL cluster."""
+def get_all_raw_logs(session_id: str) -> list:
+    """Retrieves chronological log history out of PostgreSQL scoped directly to this user's browser session."""
     try:
         conn = psycopg2.connect(DATABASE_URL)
         cursor = conn.cursor()
-        cursor.execute("SELECT payload FROM response_logs ORDER BY id DESC")
+        
+        # 1. Look for user-specific logs first
+        cursor.execute("SELECT payload FROM response_logs WHERE session_id = %s ORDER BY id DESC", (session_id,))
         rows = cursor.fetchall()
+        
+        # 2. Fall back to standard defaults if session log is currently empty
+        if not rows and session_id != "default":
+            cursor.execute("SELECT payload FROM response_logs WHERE session_id = 'default' ORDER BY id DESC")
+            rows = cursor.fetchall()
+            
         cursor.close()
         conn.close()
         
@@ -139,7 +186,6 @@ def send_to_one_api_gateway(method: str, params: dict) -> str:
             
     return f"Failed to communicate with local OneAPI gateway on port 7002: {last_error}"
 
-
 def get_expected_parameters_with_types(tool_name: str) -> dict:
     """Fetches the official MCP catalog schemas to determine tool expected keys and types."""
     try:
@@ -154,10 +200,13 @@ def get_expected_parameters_with_types(tool_name: str) -> dict:
         print(f"⚠️ [WIDGET LOG] Schema blueprint lookup failed: {e}")
     return {}
 
-def harvest_from_postgres_logs(expected_keys: list) -> dict:
+def harvest_from_postgres_logs(expected_keys: list, session_id: str) -> dict:
     """Scans backward through PostgreSQL data blocks to retrieve cached values seamlessly."""
     harvested = {}
-    logs = get_all_raw_logs()
+    logs = get_all_raw_logs(session_id)
+    
+    # Pre-calculate normalized expected keys for fast matching (e.g. mapping "sessionid" -> "sessionId")
+    normalized_expected = {k.lower().replace("_", "").replace("-", ""): k for k in expected_keys}
     
     for log in logs:
         if len(harvested) == len(expected_keys):
@@ -167,30 +216,84 @@ def harvest_from_postgres_logs(expected_keys: list) -> dict:
             if not isinstance(d, dict):
                 return
             for k, v in d.items():
-                if k in expected_keys and k not in harvested:
-                    if v is not None and not isinstance(v, (dict, list)):
-                        if isinstance(v, str) and v.strip().startswith("{") and v.strip().endswith("}"):
-                            try:
-                                search_dict(json.loads(v))
-                            except:
-                                harvested[k] = str(v)
-                        else:
-                            harvested[k] = str(v)
+                # 1. Normalize raw database key
+                norm_db_key = k.lower().replace("_", "").replace("-", "")
+                resolved_key = normalized_expected.get(norm_db_key)
                 
+                # 2. Extract value if the key matches and is not already harvested
+                if resolved_key and resolved_key not in harvested:
+                    if v is not None and not isinstance(v, (dict, list)):
+                        harvested[resolved_key] = str(v)
+                
+                # 3. Always check if the value is a nested stringified JSON block and recurse into it
+                if isinstance(v, str):
+                    v_stripped = v.strip()
+                    if v_stripped.startswith("{") and v_stripped.endswith("}"):
+                        try:
+                            parsed_json = json.loads(v_stripped)
+                            search_dict(parsed_json)
+                        except:
+                            pass
+                
+                # 4. Recurse down into standard nested dicts or arrays
                 if isinstance(v, dict):
                     search_dict(v)
                 elif isinstance(v, list):
                     for item in v:
                         if isinstance(item, dict):
                             search_dict(item)
-                        elif isinstance(item, str) and item.strip().startswith("{"):
-                            try:
-                                search_dict(json.loads(item))
-                            except:
-                                pass
+                        elif isinstance(item, str):
+                            item_stripped = item.strip()
+                            if item_stripped.startswith("{") and item_stripped.endswith("}"):
+                                try:
+                                    search_dict(json.loads(item_stripped))
+                                except:
+                                    pass
                                 
         search_dict(log)
     return harvested
+
+def resolve_fuzzy_tool_name(input_name: str) -> str:
+    """Queries the live gateway context to map conversational actions to explicit catalog tool names."""
+    try:
+        raw_tools_data = send_to_one_api_gateway(method="tools/list", params={})
+        tools_json = json.loads(raw_tools_data)
+        tools_list = tools_json.get("result", {}).get("tools", [])
+        valid_tool_names = [t.get("name") for t in tools_list if t.get("name")]
+    except Exception as e:
+        print(f"⚠️ [FUZZY LOG] Failed to load catalog schemas during resolution: {e}")
+        return input_name
+
+    # Step 1: Direct Matching
+    if input_name in valid_tool_names:
+        return input_name
+
+    cleaned_input = input_name.strip().lower()
+
+    # Step 2: Key phrase sub-string scan
+    for name in valid_tool_names:
+        name_lower = name.lower()
+        if cleaned_input in name_lower or name_lower in cleaned_input:
+            print(f"🎯 [FUZZY LOG] Resolved conversational phrase '{input_name}' to system catalog match: '{name}'")
+            return name
+
+    # Step 3: Shared intersection keyword analyzer
+    best_match = input_name
+    highest_intersect = 0
+    input_words = set(cleaned_input.replace("_", " ").replace("-", " ").split())
+    
+    for name in valid_tool_names:
+        target_words = set(name.lower().replace("_", " ").replace("-", " ").split())
+        intersection = len(input_words.intersection(target_words))
+        if intersection > highest_intersect:
+            highest_intersect = intersection
+            best_match = name
+            
+    if highest_intersect > 0:
+        print(f"🎯 [FUZZY LOG] Auto-mapped user request segment to match signature: '{best_match}'")
+        return best_match
+
+    return input_name
 
 @tool
 def inspect_one_api_catalog() -> str:
@@ -207,40 +310,50 @@ def execute_one_api_operation(tool_name: str, tool_arguments: dict) -> str:
     Use this tool to run live operational commands or API features inside the One API platform.
     Pass only the arguments explicitly mentioned or provided by the user in this turn.
     """
-    expected_params_with_types = get_expected_parameters_with_types(tool_name)
+    resolved_tool = resolve_fuzzy_tool_name(tool_name)
+    expected_params_with_types = get_expected_parameters_with_types(resolved_tool)
     expected_keys = list(expected_params_with_types.keys())
     
-    harvested_args = harvest_from_postgres_logs(expected_keys)
+    # Harvest only parameters logged under this specific browser session
+    session_id = get_current_session_id()
+    harvested_args = harvest_from_postgres_logs(expected_keys, session_id)
     merged_arguments = {**harvested_args, **tool_arguments}
     
-    print(f"⚙️ [WIDGET LOG] Explicit user inputs for this turn: {merged_arguments}")
-    print(f"🔍 [WIDGET LOG] Blueprint Lookup: Tool '{tool_name}' expects fields: {expected_keys}")
+    print(f"⚙️ [WIDGET LOG] Raw merged arguments for this turn (Session: {session_id}): {merged_arguments}")
+    print(f"🔍 [WIDGET LOG] Blueprint Lookup: Tool '{resolved_tool}' expects fields: {expected_keys}")
+    
+    # Create a normalized mapping of expected keys for robust parameter alignment
+    normalized_expected = {k.lower().replace("_", "").replace("-", ""): k for k in expected_keys}
     
     final_arguments = {}
     for k, v in merged_arguments.items():
-        if k in expected_keys:
+        norm_user_key = k.lower().replace("_", "").replace("-", "")
+        resolved_key = normalized_expected.get(norm_user_key)
+        
+        if resolved_key:
             if v is None:
-                final_arguments[k] = None
+                final_arguments[resolved_key] = None
                 continue
             
-            expected_type = expected_params_with_types.get(k, "string")
+            expected_type = expected_params_with_types.get(resolved_key, "string")
             if expected_type == "integer":
-                try: final_arguments[k] = int(v)
-                except: final_arguments[k] = v
+                try: final_arguments[resolved_key] = int(v)
+                except: final_arguments[resolved_key] = v
             elif expected_type == "number":
-                try: final_arguments[k] = float(v)
-                except: final_arguments[k] = v
+                try: final_arguments[resolved_key] = float(v)
+                except: final_arguments[resolved_key] = v
             elif expected_type == "boolean":
-                if isinstance(v, str): final_arguments[k] = v.lower() in ("true", "1", "yes")
-                else: final_arguments[k] = bool(v)
+                if isinstance(v, str): final_arguments[resolved_key] = v.lower() in ("true", "1", "yes")
+                else: final_arguments[resolved_key] = bool(v)
             else:
-                final_arguments[k] = str(v)
+                final_arguments[resolved_key] = str(v)
                 
     print(f"🚀 [WIDGET LOG] Dispatching strict filtered payload to Port 7002: {final_arguments}")
     
-    params = {"name": tool_name, "arguments": final_arguments}
+    params = {"name": resolved_tool, "arguments": final_arguments}
     raw_res = send_to_one_api_gateway(method="tools/call", params=params)
     
+    # Combinatorial Self-Healing Logic for Upstream Typing Flaws
     if "500" in str(raw_res) or "API call failed" in str(raw_res):
         print("⚠️ [WIDGET LOG] Detected potential 500 error from upstream staging. Evaluating parameter combinations...")
         flip_candidates = []
@@ -261,7 +374,7 @@ def execute_one_api_operation(tool_name: str, tool_arguments: dict) -> str:
                         test_arguments[k] = flipped_val
                         
                     print(f"🔄 [WIDGET LOG] Auto-Retry testing combination: {test_arguments}")
-                    retry_params = {"name": tool_name, "arguments": test_arguments}
+                    retry_params = {"name": resolved_tool, "arguments": test_arguments}
                     retry_res = send_to_one_api_gateway(method="tools/call", params=retry_params)
                     
                     if "500" not in str(retry_res) and "API call failed" not in str(retry_res):
@@ -275,11 +388,10 @@ def execute_one_api_operation(tool_name: str, tool_arguments: dict) -> str:
     try:
         res_json = json.loads(raw_res)
         log_raw_response(res_json)
-    except:
+    except Exception:
         pass
         
     return raw_res
-
 
 llm = ChatOpenAI(
     model="gpt-4o-mini",
@@ -303,26 +415,42 @@ def ensure_string(content) -> str:
         return "".join(text_parts)
     return str(content)
 
-
 class ChatRequest(BaseModel):
     message: str
+    session_id: str = "default"
 
 @app.post("/chat")
 async def chat_endpoint(request: ChatRequest):
     global conversation_memory
     user_query = request.message
-    print(f"📩 [WIDGET LOG] User input: {user_query}")
+    session_id = request.session_id
+    
+    # Establish dynamic routing states in Context and Fallback Registry
+    active_session_id.set(session_id)
+    SessionRegistry.set_active(session_id)
+    
+    print(f"📩 [WIDGET LOG] User input: {user_query} (Session ID: {session_id})")
     
     try:
+        # Dynamic extraction of active tool schemas for prompt optimization
+        try:
+            raw_tools = send_to_one_api_gateway(method="tools/list", params={})
+            tools_data = json.loads(raw_tools)
+            avail_tools = [t.get("name") for t in tools_data.get("result", {}).get("tools", [])]
+        except Exception:
+            avail_tools = ["inspect_one_api_catalog", "execute_one_api_operation"]
+
         system_context = (
             "You are the dedicated OneAPI System Assistant connected exclusively to your platform gateway.\n\n"
             "STATE SHIFT WARNING:\n"
             "A programmatic runtime proxy automatically handles parameter inheritance behind the scenes.\n"
             "Therefore, look only at what fields the user explicitly provides in this turn. "
             "Do not worry about missing common fields; the backend will harvest and merge them.\n\n"
+            f"Currently registered active tools on Port 7002: {avail_tools}\n\n"
             "OPERATIONAL PROTOCOL:\n"
             "1. If a user asks what actions, tasks, or capabilities you can handle, invoke 'inspect_one_api_catalog'.\n"
             "2. If a user wants to perform an action, invoke 'execute_one_api_operation' with the current inputs.\n"
+            "   Ensure the 'tool_name' argument matches one of the active tools listed above exactly.\n"
             "3. If their request is purely informational, fall back to checking your local documentation files."
         )
         
