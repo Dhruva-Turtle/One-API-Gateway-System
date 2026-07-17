@@ -1,4 +1,4 @@
-OneAPI Gateway System Documentation
+OneAPI Assistant System Documentation
 
 At its core, this project is an intelligent developer chatbot widget that connects directly to a local Model Context Protocol (MCP) gateway to simplify API testing. It allows developers to inspect tool catalogs, trigger backend workflows, and debug staging environments using natural language instead of writing manual scripts. By acting as a conversational interface, it translates simple chat commands into precise API calls while automatically managing session state and parameter validation in the background.
 
